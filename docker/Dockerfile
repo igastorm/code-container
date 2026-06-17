@@ -17,14 +17,17 @@ ARG CODELLDB_ARM64_SHA512=d38a7a484c165638a5675a22b8e3fc9bda35f2c8cd2c72c290531f
 # ==========================================
 FROM debian:trixie-slim@sha256:4e401d95de7083948053197a9c3913343cd06b706bf15eb6a0c3ccd26f436a0e
 
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
 ARG GTEST_VERSION
 ARG GTEST_SHA512
 
 RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
   echo 'Acquire::Languages::Target "en";' >> /etc/apt/apt.conf.d/99-no-languages && \
   apt-get update && apt-get install -y --no-install-recommends \
-  tini sudo locales ca-certificates \
-  supervisor libnss-extrausers \
+  tini sudo ca-certificates \
+  libnss-extrausers \
   llvm \
   clang clang-tools clang-format clang-tidy clangd \
   libclang-rt-dev \
@@ -37,14 +40,21 @@ RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
   # LLVM Native Toolchain
   # ==========================================
   CLANG_VER=$(clang --version | grep -oE 'clang version [0-9]+' | grep -oE '[0-9]+' | head -n1) && \
-  mkdir -p /etc/clang && \
-  echo "-fuse-ld=lld" > /etc/clang/clang.cfg && \
-  echo "-rtlib=compiler-rt" >> /etc/clang/clang.cfg && \
-  echo "-stdlib=libc++" > /etc/clang/clang++.cfg && \
-  echo "-fuse-ld=lld" >> /etc/clang/clang++.cfg && \
-  echo "-rtlib=compiler-rt" >> /etc/clang/clang++.cfg && \
-  ln -s clang.cfg /etc/clang/clang-${CLANG_VER}.cfg && \
-  ln -s clang++.cfg /etc/clang/clang++-${CLANG_VER}.cfg && \
+  CLANG_BIN_DIR="/usr/lib/llvm-${CLANG_VER}/bin" && \
+  TRIPLE=$(clang -print-target-triple) && \
+  mkdir -p "${CLANG_BIN_DIR}" && \
+  echo "-fuse-ld=lld" > "${CLANG_BIN_DIR}/clang.cfg" && \
+  echo "-rtlib=compiler-rt" >> "${CLANG_BIN_DIR}/clang.cfg" && \
+  echo "-stdlib=libc++" > "${CLANG_BIN_DIR}/clang++.cfg" && \
+  echo "-fuse-ld=lld" >> "${CLANG_BIN_DIR}/clang++.cfg" && \
+  echo "-rtlib=compiler-rt" >> "${CLANG_BIN_DIR}/clang++.cfg" && \
+  cd "${CLANG_BIN_DIR}" && \
+  ln -sf clang.cfg clang-${CLANG_VER}.cfg && \
+  ln -sf clang++.cfg clang++-${CLANG_VER}.cfg && \
+  ln -sf clang.cfg ${TRIPLE}-clang.cfg && \
+  ln -sf clang++.cfg ${TRIPLE}-clang++.cfg && \
+  ln -sf clang.cfg ${TRIPLE}-clang-${CLANG_VER}.cfg && \
+  ln -sf clang++.cfg ${TRIPLE}-clang++-${CLANG_VER}.cfg && \
   # ==========================================
   # GoogleTest (libc++ & Disabled exception)
   # ==========================================
@@ -66,8 +76,7 @@ RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
   (getent passwd messagebus || useradd -r -g messagebus -s /usr/sbin/nologin messagebus) && \
   apt-get clean && \
   find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} + && \
-  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* /usr/share/man/* && \
-  sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen && update-locale LANG=en_US.UTF-8
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* /usr/share/man/*
 
 RUN sed -i 's/passwd:.*files/& extrausers/' /etc/nsswitch.conf && \
   sed -i 's/group:.*files/& extrausers/' /etc/nsswitch.conf && \
@@ -86,7 +95,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["sh", "-c", "curl -fsS http://localhost:3000 -o /dev/null || exit 1"]
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY supervisord-template.conf /usr/local/etc/supervisord-template.conf
 COPY settings.json /usr/local/etc/settings.json
 RUN chmod +x /usr/local/bin/entrypoint.sh
 # ==========================================

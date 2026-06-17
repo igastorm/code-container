@@ -1,42 +1,24 @@
 #!/bin/bash
-set -euo pipefail 
+set -euo pipefail
 
 # ==========================================
-generate_config_file() {
-    TEMPLATE=$1
-    OUT_DIR=$2
-    OUT="$OUT_DIR/"$3
-
-    if [[ ! -f "$TEMPLATE" ]]; then
-        echo "ERROR: template file '$TEMPLATE' not found." >&2
-        return 1
-    fi
-
-    mkdir -p "$OUT_DIR"
-
-    TMP="$(mktemp "${OUT}.tmp.XXXXXX")"
-    trap 'rm -f "$TMP"' EXIT
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        line="${line//\$USER_NAME/$USER_NAME}"
-        line="${line//\$USER_PASSWORD/$USER_PASSWORD}"
-        line="${line//\$USER_UID/$USER_UID}" 
-        printf '%s\n' "$line" >> "$TMP"
-    done < "$TEMPLATE"
-
-    if grep -q '\$USER_' "$TMP"; then
-        echo "Warning: Template still contains unsubstituted \$USER_ variables." >&2
-    fi
-
-    chmod 600 "$TMP"
-    mv "$TMP" "$OUT"
-    trap - EXIT
-}
-
-# ==========================================
-if [ -z "$USER_NAME" ] ||[ -z "$USER_UID" ] || [ -z "$USER_GID" ]; then
-    echo "ERROR: USER_NAME, USER_UID, or USER_GID environment variable is not set. Container stopped."
+if [ -z "$USER_NAME" ]; then
+    echo "ERROR: USER_NAME environment variable is not set. Container stopped."
     exit 1
+fi
+
+# ==========================================
+DETECTED_UID=$(stat -c '%u' /home)
+DETECTED_GID=$(stat -c '%g' /home)
+
+USER_UID="${USER_UID:-$DETECTED_UID}"
+USER_GID="${USER_GID:-$DETECTED_GID}"
+
+if [ "$USER_UID" -eq 0 ]; then
+    USER_UID=1000
+fi
+if [ "$USER_GID" -eq 0 ]; then
+    USER_GID=1000
 fi
 
 # ==========================================
@@ -51,12 +33,7 @@ if ! id -u "$USER_NAME" >/dev/null 2>&1; then
     echo "$USER_NAME:x:$USER_GID:" > /tmp/extrausers/group
     echo "sudo:x:$SUDO_GID:$USER_NAME" >> /tmp/extrausers/group
     
-    if [ -z "$USER_PASSWORD" ]; then
-        echo "$USER_NAME::19000:0:99999:7:::" > /tmp/extrausers/shadow
-    else
-        HASH=$(openssl passwd -6 "$USER_PASSWORD")
-        echo "$USER_NAME:$HASH:19000:0:99999:7:::" > /tmp/extrausers/shadow
-    fi
+    echo "$USER_NAME:*:19000:0:99999:7:::" > /tmp/extrausers/shadow
     
     chmod 0644 /tmp/extrausers/passwd /tmp/extrausers/group
     chmod 0640 /tmp/extrausers/shadow
@@ -74,13 +51,6 @@ chown $USER_UID:$USER_GID /tmp/run/user/$USER_UID
 chmod 0700 /tmp/run/user/$USER_UID
 
 # ==========================================
-if [ ! -f "$HOME_DIR/.bashrc" ]; then
-cat <<EOF | sudo -u "$USER_NAME" tee -a "$HOME_DIR/.bashrc" > /dev/null
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-EOF
-fi
-
 CS_USER_DIR="/home/$USER_NAME/.local/share/code-server/User"
 if  [ ! -f "$CS_USER_DIR/settings.json" ]; then
     sudo -u "$USER_NAME" mkdir -p "$CS_USER_DIR"
@@ -94,13 +64,21 @@ if [ -f "/usr/local/bin/custom-setup.sh" ]; then
 fi
 
 # ==========================================
-generate_config_file "/usr/local/etc/supervisord-template.conf" "/tmp" "supervisord.conf"
-if [ -z "$SUPERVISOR_LOG" ]; then
-    echo "ERROR: SUPERVISOR_LOG environment variable is not set. Container stopped."
+if [ -z "$LOG" ]; then
+    echo "ERROR: LOG environment variable is not set. Container stopped."
     exit 1
 fi
-SUPERVISOR_LOG="-s"
-if [ "$SUPERVISOR_LOG" = "on" ] || [ "$SUPERVISOR_LOG" = "ON" ]; then
-    SUPERVISOR_LOG=""
+
+CODE_SERVER=\
+    sudo -u "$USER_NAME" /usr/local/code-server/bin/code-server \
+    --bind-addr 0.0.0.0:3000 \
+    --auth none \
+    --disable-telemetry \
+    --disable-update-check \
+    --disable-workspace-trust
+
+if [ "$LOG" = "on" ] || [ "$LOG" = "ON" ]; then
+  exec $CODE_SERVER
+else
+  exec $CODE_SERVER > /dev/null 2>&1
 fi
-exec supervisord $SUPERVISOR_LOG -n -c /tmp/supervisord.conf
