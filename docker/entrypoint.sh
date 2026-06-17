@@ -8,6 +8,8 @@ if [ -z "$USER_NAME" ]; then
 fi
 
 # ==========================================
+USER_NAME="${USER_NAME:-devenv}"
+
 DETECTED_UID=$(stat -c '%u' /home)
 DETECTED_GID=$(stat -c '%g' /home)
 
