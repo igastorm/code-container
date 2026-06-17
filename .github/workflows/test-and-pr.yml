@@ -41,12 +41,8 @@ jobs:
             --read-only \
             --tmpfs /tmp:exec \
             -e USER_NAME=testuser \
-            -e USER_PASSWORD=testpass \
-            -e USER_UID=$(id -u) \
-            -e USER_GID=$(id -g) \
-            -e SUPERVISOR_LOG=on \
+            -e LOG=on \
             -v $(pwd)/workspace:/home \
-            -p 8080:8080 \
             -p 3000:3000 \
             test-image:latest
 
