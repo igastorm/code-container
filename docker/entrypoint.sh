@@ -2,6 +2,13 @@
 set -euo pipefail
 
 # ==========================================
+LOG="${LOG:-ON}"
+
+if [ "$LOG" != "on" ] && [ "$LOG" != "ON" ]; then
+    exec > /dev/null 2>&1
+fi
+
+# ==========================================
 USER_NAME="${USER_NAME:-devenv}"
 
 DETECTED_UID=$(stat -c '%u' /home)
@@ -60,19 +67,9 @@ if [ -f "/usr/local/bin/custom-setup.sh" ]; then
 fi
 
 # ==========================================
-if [ -z "$LOG" ]; then
-    echo "ERROR: LOG environment variable is not set. Container stopped."
-    exit 1
-fi
-
-FLAG="> /dev/null 2>&1"
-if [ "$LOG" = "on" ] || [ "$LOG" = "ON" ]; then
-  FLAG=""
-fi
-
 exec sudo -u "$USER_NAME" /usr/local/code-server/bin/code-server \
     --bind-addr 0.0.0.0:3000 \
     --auth none \
     --disable-telemetry \
     --disable-update-check \
-    --disable-workspace-trust $FLAG
+    --disable-workspace-trust

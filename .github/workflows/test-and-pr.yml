@@ -40,7 +40,6 @@ jobs:
             --name test-container \
             --read-only \
             --tmpfs /tmp:exec \
-            -e LOG=on \
             -v $(pwd)/workspace:/home \
             -p 3000:3000 \
             test-image:latest
