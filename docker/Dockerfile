@@ -24,7 +24,6 @@ ARG GTEST_VERSION
 ARG GTEST_SHA512
 
 RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
-  echo 'Acquire::Languages::Target "en";' >> /etc/apt/apt.conf.d/99-no-languages && \
   apt-get update && apt-get install -y --no-install-recommends \
   tini sudo ca-certificates \
   libnss-extrausers \
@@ -75,7 +74,7 @@ RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
   (getent group messagebus || groupadd -r messagebus) && \
   (getent passwd messagebus || useradd -r -g messagebus -s /usr/sbin/nologin messagebus) && \
   apt-get clean && \
-  find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} + && \
+  find /usr/share/locale -mindepth 1 -maxdepth 1 -exec rm -rf {} + && \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* /usr/share/man/*
 
 RUN sed -i 's/passwd:.*files/& extrausers/' /etc/nsswitch.conf && \
@@ -87,9 +86,7 @@ RUN sed -i 's/passwd:.*files/& extrausers/' /etc/nsswitch.conf && \
   sed -i '1i account sufficient pam_extrausers.so' /etc/pam.d/common-account && \
   rm -rf /var/log && ln -s /tmp/log /var/log && \
   rm -rf /run && ln -s /tmp/run /run && \
-  rm -rf /var/lib/extrausers && ln -s /tmp/extrausers /var/lib/extrausers && \
-  echo '#!/bin/bash\ncd /home/"$USER_NAME"\nexec sudo -u "$USER_NAME" "$@"' > /usr/local/bin/run-as-user && \
-  chmod +x /usr/local/bin/run-as-user
+  rm -rf /var/lib/extrausers && ln -s /tmp/extrausers /var/lib/extrausers
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["sh", "-c", "curl -fsS http://localhost:3000 -o /dev/null || exit 1"]
