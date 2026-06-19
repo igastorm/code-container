@@ -4,9 +4,9 @@
 ARG GTEST_VERSION=1.17.0
 ARG GTEST_SHA512=0f57e9ef06925e5b7722df1eb92ef5850e8dce79220ea16a8aaff586a71c0b01460ef1713649ee24ffedb2e6ad5a51e9198c5a5ae1b2789e43feb1f494e7d45c
 
-ARG CODE_SERVER_VERSION=4.124.2
-ARG CODE_SERVER_AMD64_SHA512=6fc5a43eea1e42cd22be380f36d26286c6fececd8c343896ec8feee551f6fd5663430de895b391ed831d2ad29dbde1ae78b253bf84b82f88fc6b8358286e8721
-ARG CODE_SERVER_ARM64_SHA512=ec18844f49194a052b98dacd8e2d2c91f82fc71ab8ba566ae6fea353fb81bff5f0ded1a43cbc2f7501ea56839e78733c5a678ee5774a176a1d02775ab5db45a8
+ARG CODE_SERVER_VERSION=4.125.0
+ARG CODE_SERVER_AMD64_SHA512=c99cc7f14796853dbf77905869434514c0e009a8103fcd4a9dc679e5d0420916bd27106f695ea126d38a34c18dfc1759fde589f65a81ccb8d024698aea662f7b
+ARG CODE_SERVER_ARM64_SHA512=744ec4480c6b8bb65a7ac7082bfd11df2d3873d60f8b29cf13ae562592c326150b65f512163609a1d8c6495cc2210a54a7b4a06adb3416cd7f4b64188335e4e4
 
 ARG CODELLDB_VERSION=1.12.2
 ARG CODELLDB_X64_SHA512=8076083c0303101edb46f7bf1ebe88d10c41ef9c399a245af8d30a25069cab9c7ab17c63c448a366dcd74a60b9dd9697b34831442e6738a4f2309514bb7096b9
@@ -24,7 +24,6 @@ ARG GTEST_VERSION
 ARG GTEST_SHA512
 
 RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
-  echo 'Acquire::Languages::Target "en";' >> /etc/apt/apt.conf.d/99-no-languages && \
   apt-get update && apt-get install -y --no-install-recommends \
   tini sudo ca-certificates \
   libnss-extrausers \
@@ -75,7 +74,7 @@ RUN echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/99-no-languages && \
   (getent group messagebus || groupadd -r messagebus) && \
   (getent passwd messagebus || useradd -r -g messagebus -s /usr/sbin/nologin messagebus) && \
   apt-get clean && \
-  find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en*' ! -name 'locale.alias' -exec rm -rf {} + && \
+  find /usr/share/locale -mindepth 1 -maxdepth 1 -exec rm -rf {} + && \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/* /usr/share/man/*
 
 RUN sed -i 's/passwd:.*files/& extrausers/' /etc/nsswitch.conf && \
@@ -87,9 +86,7 @@ RUN sed -i 's/passwd:.*files/& extrausers/' /etc/nsswitch.conf && \
   sed -i '1i account sufficient pam_extrausers.so' /etc/pam.d/common-account && \
   rm -rf /var/log && ln -s /tmp/log /var/log && \
   rm -rf /run && ln -s /tmp/run /run && \
-  rm -rf /var/lib/extrausers && ln -s /tmp/extrausers /var/lib/extrausers && \
-  echo '#!/bin/bash\ncd /home/"$USER_NAME"\nexec sudo -u "$USER_NAME" "$@"' > /usr/local/bin/run-as-user && \
-  chmod +x /usr/local/bin/run-as-user
+  rm -rf /var/lib/extrausers && ln -s /tmp/extrausers /var/lib/extrausers
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["sh", "-c", "curl -fsS http://localhost:3000 -o /dev/null || exit 1"]
