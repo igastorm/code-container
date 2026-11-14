@@ -15,7 +15,7 @@ ARG CODELLDB_ARM64_SHA512=935b3d516e996f6d25948ba8a54c1b7f70f7f0e3f517e36481fdf0
 # ==========================================
 # Runtime
 # ==========================================
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
